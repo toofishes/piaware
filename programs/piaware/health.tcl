@@ -117,11 +117,7 @@ proc is_adsb_program_running {} {
 #
 proc construct_health_array {_row} {
     upvar $_row row
-    catch {array set row [filesystem_usage]}
 	catch {set row(adsbprogram_running) [is_adsb_program_running]}
-    catch {set row(cputemp) [cpu_temperature]}
-    catch {set row(cpuload) [get_cpu_load]}
-    catch {set row(uptime) [get_uptime]}
 
 	if {[info exists ::netstatus(program_30005)]} {
 		set row(adsbprogram) $::netstatus(program_30005)
