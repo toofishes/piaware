@@ -5,7 +5,7 @@
 #
 #
 
-set adeptConfigFile "/root/.piaware"
+set adeptConfigFile "/etc/piaware.adept.conf"
 
 #
 # load_adept_config - open and read in the adept config file.
@@ -54,7 +54,7 @@ proc set_adept_config {var value} {
 #  global array to the adept config file.
 #
 proc save_adept_config {} {
-	set fp [open $::adeptConfigFile w 0600]
+	set fp [open $::adeptConfigFile w 0644]
 	foreach var [lsort [array names ::adeptConfig]] {
 		puts $fp [list $var $::adeptConfig($var)]
 	}
