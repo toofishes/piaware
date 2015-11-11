@@ -58,8 +58,6 @@ proc main {{argv ""}} {
 		exit 1
 	}
 
-	user_check
-
 	load_adept_config
 	process_parameters ::params
 }

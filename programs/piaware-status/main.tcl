@@ -26,10 +26,6 @@ set ::die 0
 # main - the main program
 #
 proc main {{argv ""}} {
-	if {[id user] != "root"} {
-		puts stderr "you need to be root to run this, try 'sudo $::argv0'"
-		exit 1
-	}
 	load_adept_config
 	report_status
 }

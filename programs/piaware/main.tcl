@@ -58,9 +58,6 @@ proc main {{argv ""}} {
 
 	setup_faup1090_vars
 
-	# check what user we're running as
-	user_check
-
 	load_piaware_config_and_stuff
 
 	#::tcllauncher::daemonize
