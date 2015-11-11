@@ -774,32 +774,6 @@ set caDir [file join [file dirname [info script]] "ca"]
 	}
 
 	#
-	# send_log_message - upload log message if connected
-	#
-	method send_log_message {text} {
-		if {![is_connected]} {
-			return
-		}
-
-		set message(type) log
-		set message(message) [string map {\n \\n \t \\t} $text]
-		set message(mac) [get_mac_address_or_quit]
-
-		if {[info exists ::myClockOffset]} {
-			set message(offset) $::myClockOffset
-		}
-
-		foreach var "user" globalVar "::flightaware_user" {
-			if {[info exists $globalVar]} {
-				set message($var) [set $globalVar]
-			}
-		}
-
-		send_array message
-	}
-
-
-	#
 	# get_mac_address - return the mac address of eth0 as a unique handle
 	#  to this device.
 	#
