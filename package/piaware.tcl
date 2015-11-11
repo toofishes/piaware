@@ -213,27 +213,16 @@ proc test_port_callback {timer sock status callback} {
 #   command
 #
 proc process_netstat_socket_line {line} {
-    lassign $line proto recvq sendq localAddress foreignAddress state pidProg
-    lassign [split $pidProg "/"] pid prog
+    lassign $line proto recvq sendq localAddress foreignAddress state
 
     if {[string match "*:30005" $localAddress] && $state == "LISTEN"} {
-		set ::netstatus(program_30005) $prog
+		set ::netstatus(program_30005) "dump1090"
 		set ::netstatus(status_30005) 1
     }
 
-    switch $prog {
-		"faup1090" {
-			if {[string match "*:30005" $foreignAddress] && $state == "ESTABLISHED"} {
-				set ::netstatus(faup1090_30005) 1
-			}
-		}
-
-		"piaware" {
-			if {[string match "*:1200" $foreignAddress] && $state == "ESTABLISHED"} {
-				set ::netstatus(piaware_1200) 1
-			}
-		}
-    }
+	if {[string match "*:1200" $foreignAddress] && $state == "ESTABLISHED"} {
+		set ::netstatus(piaware_1200) 1
+	}
 }
 
 #
@@ -241,11 +230,10 @@ proc process_netstat_socket_line {line} {
 #
 proc inspect_sockets_with_netstat {} {
     set ::netstatus(status_30005) 0
-    set ::netstatus(faup1090_30005) 0
     set ::netstatus(piaware_1200) 0
 
 	# We must do this to get the expected socket state strings.
-	set fp [open_nolocale "|netstat --program --protocol=inet --tcp --wide --all --numeric"]
+	set fp [open_nolocale "|netstat --protocol=inet --tcp --wide --all --numeric"]
     # discard two header lines
     gets $fp
     gets $fp
@@ -281,7 +269,6 @@ proc netstat_report {} {
 		puts "$::netstatus(program_30005) is listening for connections on port 30005."
 	}
 
-    puts "[subst_is_or_is_not "faup1090 %s connected to port 30005." $::netstatus(faup1090_30005)]"
     puts "[subst_is_or_is_not "piaware %s connected to FlightAware." $::netstatus(piaware_1200)]"
 }
 
