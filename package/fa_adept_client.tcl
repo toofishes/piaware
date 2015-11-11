@@ -657,25 +657,6 @@ set caDir [file join [file dirname [info script]] "ca"]
 	}
 
 	#
-	# send_log_message - upload log message if connected
-	#
-	method send_log_message {text} {
-		if {![is_connected]} {
-			return
-		}
-
-		set message(type) log
-		set message(message) [string map {\n \\n \t \\t} $text]
-		set message(mac) $mac
-
-		if {[info exists ::myClockOffset]} {
-			set message(offset) $::myClockOffset
-		}
-
-		send_array message
-	}
-
-	#
 	# send_health_message - upload health message if connected
 	#
 	method send_health_message {_data} {

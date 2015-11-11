@@ -24,7 +24,6 @@ proc logger {text} {
 	     # adept client has not yet loaded
 	     return 0
 	}
-	adept send_log_message $text
 }
 
 #
