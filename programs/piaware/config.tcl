@@ -27,6 +27,6 @@ set sendHealthInformationIntervalSeconds 300
 set adsbNoProducerStartDelaySeconds 360
 
 # where we store our location info
-set locationFile "/var/lib/dump1090/latlon"
+set locationFile "/tmp/latlon"
 
 # vim: set ts=4 sw=4 sts=4 noet :

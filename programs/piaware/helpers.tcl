@@ -245,7 +245,7 @@ proc cleanup_and_exit {} {
 }
 
 #
-# load lat/lon info from /var/lib if available
+# load lat/lon info if available
 #
 proc load_location_info {} {
 	if {[catch {set ll [try_load_location_info]}] == 1} {
