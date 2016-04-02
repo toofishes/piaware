@@ -9,7 +9,6 @@ package require http
 package require tls
 package require Itcl
 package require tryfinallyshim
-package require fa_sudo
 
 set piawarePidFile /var/run/piaware.pid
 set piawareConfigFile /etc/piaware
@@ -22,7 +21,7 @@ proc open_nolocale {args} {
 	array unset ::env LANG
 	array unset ::env LC_*
 	try {
-		return [::fa_sudo::open_as {*}$args]
+		return [open {*}$args]
 	} finally {
 		# work around http://core.tcl.tk/tcl/info/bc1a96407a
 		# (::env is internally a traced variable, so trying to
@@ -36,28 +35,6 @@ proc open_nolocale {args} {
 			set ::env($k) $v
 		}
 	}
-}
-
-# query_dpkg_names_and_versions - Match installed package names and return a list
-# of names and versions.
-proc query_dpkg_names_and_versions {pattern} {
-	set results [list]
-
-	set queryargs [list dpkg-query --showformat {${binary:Package} ${Version} ${Status}\n} --show $pattern]
-	if {[catch {set pipe [::fa_sudo::open_as "|$queryargs" "r"]}]} {
-		# silently swallow
-		return $results
-	}
-
-	while {[gets $pipe line] >= 0} {
-		lassign [split $line " "] pkg version status_want status_eflag status_status
-		if {$status_want eq "install" || $status_status eq "installed"} {
-			lappend results $pkg $version
-		}
-	}
-
-	catch {close $pipe}
-	return $results
 }
 
 # is_pid_running - return 1 if the specified process ID is running, else 0
@@ -187,13 +164,8 @@ proc inspect_sockets_with_netstat {} {
 	# try to run as root if we can, to get the program names
 	if {[catch {
 		set command [list netstat --program --tcp --wide --all --numeric]
-		if {[::fa_sudo::can_sudo root {*}$command]} {
-			set ::netstatus_reliable 1
-			set fp [open_nolocale -root "|$command 2>/dev/null"]
-		} else {
-			# discard the warning about not being able to see all data
-			set fp [open_nolocale "|$command 2>/dev/null"]
-		}
+		# discard the warning about not being able to see all data
+		set fp [open_nolocale "|$command 2>/dev/null"]
 
 		# discard two header lines
 		gets $fp

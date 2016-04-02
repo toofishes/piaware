@@ -5,9 +5,6 @@
 # Copyright (C) 2014 FlightAware LLC, All Rights Reserved
 #
 
-package require fa_sudo
-package require fa_services
-
 #
 # setup_faup1090_vars - setup vars but don't start faup1090
 #
@@ -120,8 +117,6 @@ proc connect_adsb_via_faup1090 {} {
 			# still no listener, consider restarting
 			set secondsSinceListenerSeen [expr {[clock seconds] - $::lastAdsbConnectedClock}]
 			if {$secondsSinceListenerSeen >= $::adsbNoProducerStartDelaySeconds && $::adsbDataService ne ""} {
-				logger "no ADS-B data program seen listening on port $::adsbLocalPort for $secondsSinceListenerSeen seconds, trying to start it..."
-				::fa_services::attempt_service_restart $::adsbDataService start
 				# pretend we saw it to reduce restarts if it's failing
 				set ::lastAdsbConnectedClock [clock seconds]
 				schedule_adsb_connect_attempt 10
@@ -149,27 +144,23 @@ proc connect_adsb_via_faup1090 {} {
 
 	logger "Starting faup1090: $args"
 
-	if {[catch {::fa_sudo::popen_as -noroot -stdout faupStdout -stderr faupStderr {*}$args} result] == 1} {
+	set faupStderr [chan pipe]
+	set faupStderrWrite [lindex $faupStderr 1]
+	lappend args "2>@$faupStderrWrite"
+	if {[catch {set ::faupPipe [open |$args r+]} result] == 1} {
 		logger "got '$result' starting faup1090, will try again in 5 minutes"
 		schedule_adsb_connect_attempt 300
 		return
 	}
 
-	if {$result == 0} {
-		logger "could not start faup1090: sudo refused to start the command, will try again in 5 minutes"
-		schedule_adsb_connect_attempt 300
-		return
-	}
+	logger "Started faup1090 (pid [pid $::faupPipe]) to connect to $::adsbDataProgram"
+	fconfigure $::faupPipe -buffering line -blocking 0 -translation lf
+	fileevent $::faupPipe readable faup1090_data_available
 
+	close $faupStderrWrite
+	log_subprocess_output "faup1090([pid $::faupPipe])" [lindex $faupStderr 0]
 
-	logger "Started faup1090 (pid $result) to connect to $::adsbDataProgram"
-	fconfigure $faupStdout -buffering line -blocking 0 -translation lf
-	fileevent $faupStdout readable faup1090_data_available
-
-	log_subprocess_output "faup1090($result)" $faupStderr
-
-	set ::faupPipe $faupStdout
-	set ::faupPid $result
+	set ::faupPid [pid $::faupPipe]
 
 	# pretend we saw a message so we don't repeatedly restart
 	set ::lastFaupMessageClock [clock seconds]
@@ -329,9 +320,6 @@ proc check_adsb_traffic {} {
 			# force a restart
 			logger "no new messages received in $secondsSinceLastMessage seconds, it might just be that there haven't been any aircraft nearby but I'm going to try to restart everything, just in case..."
 			stop_faup1090
-			if {$::adsbDataService ne ""} {
-				::fa_services::attempt_service_restart $::adsbDataService restart
-			}
 			schedule_adsb_connect_attempt 10
 		}
 	} else {
@@ -386,13 +374,6 @@ proc update_location {lat lon} {
 	# changed nontrivially; restart faup1090 to use the new values
 	set ::receiverLat $lat
 	set ::receiverLon $lon
-
-	# speculatively restart dump1090 even if we are not using it as a receiver;
-	# it may be used for display.
-	if {$saved} {
-		logger "Receiver location changed, restarting dump1090"
-		::fa_services::attempt_service_restart dump1090 restart
-	}
 
 	if {[info exists ::faupPipe]} {
 		logger "Receiver location changed, restarting faup1090"

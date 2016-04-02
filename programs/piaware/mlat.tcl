@@ -4,8 +4,6 @@
 # This bridges multilateration messages between a
 # mlat-client subprocess and the adept server.
 
-package require fa_sudo
-
 # does the server want mlat data?
 set ::mlatEnabled 0
 # is our client ready for data?
@@ -82,9 +80,7 @@ proc close_mlat_client {} {
 	}
 
 	set ::mlatReady 0
-	lassign $::mlatPipe mlatRead mlatWrite
-	catch {close $mlatRead}
-	catch {close $mlatWrite}
+	catch {close $::mlatPipe}
 
 	catch {
 		lassign [timed_waitpid 15000 $::mlatPid] deadpid why code
@@ -149,27 +145,23 @@ proc start_mlat_client {} {
 
 	logger "Starting multilateration client: $command"
 
-	if {[catch {::fa_sudo::popen_as -noroot -stdin mlatStdin -stdout mlatStdout -stderr mlatStderr {*}$command} result]} {
+	set mlatStderr [chan pipe]
+	set mlatStderrWrite [lindex $mlatStderr 1]
+	lappend command "2>@$mlatStderrWrite"
+	if {[catch {set ::mlatPipe [open |$command r+]} result] == 1} {
 		logger "got '$result' starting multilateration client"
 		schedule_mlat_client_restart
 		return
 	}
 
-	if {$result == 0} {
-		logger "could not start multilateration client: sudo refused to start the command"
-		schedule_mlat_client_restart
-		return
-	}
+	fconfigure $::mlatPipe -buffering line -blocking 0 -translation lf
+	fileevent $::mlatPipe readable mlat_data_available
 
-	fconfigure $mlatStdin -buffering line -blocking 0 -translation lf
+	close $mlatStderrWrite
+	log_subprocess_output "mlat-client([pid $::mlatPipe])" [lindex $mlatStderr 0]
 
-	fconfigure $mlatStdout -buffering line -blocking 0 -translation lf
-	fileevent $mlatStdout readable mlat_data_available
-
-	log_subprocess_output "mlat-client($result)" $mlatStderr
 	set ::mlatReady 0
-	set ::mlatPipe [list $mlatStdout $mlatStdin]
-	set ::mlatPid $result
+	set ::mlatPid [pid $::mlatPipe]
 	set ::mlatStatus "initializing"
 }
 
@@ -230,9 +222,7 @@ proc forward_to_mlat_client {_row} {
 	}
 
 	set message [string range $message 1 end]
-
-	lassign $::mlatPipe mlatRead mlatWrite
-	if {[catch {puts $mlatWrite $message} catchResult] == 1} {
+	if {[catch {puts $::mlatPipe $message} catchResult] == 1} {
 		logger "got '$catchResult' writing to multilateration client, restarting.."
 		close_and_restart_mlat_client
 		return
@@ -240,15 +230,13 @@ proc forward_to_mlat_client {_row} {
 }
 
 proc mlat_data_available {} {
-	lassign $::mlatPipe mlatRead mlatWrite
-
-	if ([eof $mlatRead]) {
+	if ([eof $::mlatPipe]) {
 		logger "got EOF from multilateration client"
 		close_and_restart_mlat_client
 		return
 	}
 
-	if {[catch {set size [gets $mlatRead line]} catchResult] == 1} {
+	if {[catch {set size [gets $::mlatPipe line]} catchResult] == 1} {
 		logger "got '$catchResult' reading from multilateration client, restarting.."
 		close_and_restart_mlat_client
 		return

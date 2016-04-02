@@ -9,7 +9,6 @@
 
 package require Itcl
 package require tryfinallyshim
-package require fa_sudo
 package require Tclx
 
 namespace eval ::fa_piaware_config {
@@ -278,7 +277,6 @@ namespace eval ::fa_piaware_config {
 		public variable metadata
 		public variable readonly 0
 		public variable priority 0
-		public variable writeHelper
 		public variable eol "lf"
 
 		private variable lines
@@ -377,10 +375,6 @@ namespace eval ::fa_piaware_config {
 				return 1
 			}
 
-			if {[id userid] != 0 && [info exists writeHelper] && [::fa_sudo::can_sudo root $writeHelper $filename]} {
-				return 0
-			}
-
 			if {![file writable $filename] || ![file writable [file dirname $filename]]} {
 				return 1
 			}
@@ -425,35 +419,21 @@ namespace eval ::fa_piaware_config {
 				if {![file writable [file dirname $filename]]} {
 					error "can't write config file $filename, containing directory is readonly"
 				}
-				set useHelper 0
 			} else {
 				# check that we can set the same ownership
 				if {![file writable [file dirname $filename]] ||
 					$fpstat(uid) != [id userid] ||
 					($fpstat(gid) != [id groupid] && $fpstat(gid) ni [id groupids])} {
-					# we cannot write the file directly
-					if {[info exists writeHelper] && [::fa_sudo::can_sudo root $writeHelper $filename]} {
-						set useHelper 1
-					} else {
-						error "can't directly write config file $filename, and no helper is available"
-					}
-				} else {
-					set useHelper 0
+					error "can't directly write config file $filename"
 				}
 			}
 
-			if {$useHelper} {
-				# send the new file via a pipe to the helper
-				# which will do the actual work
-				set f [::fa_sudo::open_as -root "|$writeHelper $filename" "w"]
-			} else {
-				# write the file directly ourselves
-				set temppath "${filename}.new"
-				set f [open $temppath "w" [expr {$fpstat(mode) & 0777}]]
+			# write the file directly ourselves
+			set temppath "${filename}.new"
+			set f [open $temppath "w" [expr {$fpstat(mode) & 0777}]]
 
-				# fix the ownership to match the old file
-				chown -fileid [list $fpstat(uid) $fpstat(gid)] $f
-			}
+			# fix the ownership to match the old file
+			chown -fileid [list $fpstat(uid) $fpstat(gid)] $f
 
 			# write the new data
 			try {
@@ -470,10 +450,8 @@ namespace eval ::fa_piaware_config {
 				close $f
 				unset f
 
-				if {!$useHelper} {
-					file rename -force -- $temppath $filename
-					unset temppath
-				}
+				file rename -force -- $temppath $filename
+				unset temppath
 			} finally {
 				if {[info exists f]} {
 					catch {close $f}
@@ -983,9 +961,9 @@ namespace eval ::fa_piaware_config {
 		set combined [uplevel 1 ::fa_piaware_config::new ::fa_piaware_config::ConfigGroup $name -metadata $metadata]
 
 		$combined add [new ConfigFile #auto -filename "/usr/share/piaware-support/piaware-image-config.txt" -metadata $metadata -priority 30 -readonly 1]
-		$combined add [new ConfigFile #auto -filename "/etc/piaware.conf" -metadata $metadata -priority 40 -writeHelper $::fa_piaware_config::helperPath]
+		$combined add [new ConfigFile #auto -filename "/etc/piaware.conf" -metadata $metadata -priority 40]
 
-		$combined add [new ConfigFile #auto -filename "/boot/piaware-config.txt" -metadata $metadata -priority 50 -writeHelper $::fa_piaware_config::helperPath -eol crlf]
+		$combined add [new ConfigFile #auto -filename "/boot/piaware-config.txt" -metadata $metadata -priority 50 -eol crlf]
 
 		set prio 100
 		foreach f [lsort [glob -nocomplain -types f "/media/usb/*/piaware-config.txt"]] {

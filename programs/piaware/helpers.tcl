@@ -7,8 +7,6 @@
 
 package require tls
 package require fa_piaware_config
-package require fa_services
-package require fa_sudo
 package require fa_sysinfo
 
 # speculatively try to load the extra FF config options
@@ -58,7 +56,7 @@ proc log_bgerror {message _options} {
 proc greetings {} {
 	log_locally "****************************************************"
 	log_locally "piaware version $::piawareVersionFull is running, process ID [pid]"
-	log_locally "your system info is: [::fa_sudo::exec_as /bin/uname --all]"
+	log_locally "your system info is: [exec /bin/uname --all]"
 }
 
 #
@@ -72,8 +70,7 @@ proc setup_adept_client {} {
 		-loginCommand ::gather_login_info \
 		-loginResultCommand ::handle_login_result \
 		-updateLocationCommand ::adept_location_changed \
-		-mlatCommand ::forward_to_mlat_client \
-		-updateCommand ::handle_update_request
+		-mlatCommand ::forward_to_mlat_client
 
 	if {$::params(serverhosts) ne ""} {
 		adept configure -hosts $::params(serverhosts)
@@ -239,28 +236,6 @@ proc remove_pidfile {} {
 
 	cleanup_named_pidfile $file
 }
-
-#
-# restart_piaware - restart the piaware program, called from the piaware
-# program, so it's a bit tricky
-#
-proc restart_piaware {} {
-	# unlock the pidfile if we have a lock, so that the new piaware can
-	# get the lock even if we're still running.
-	unlock_pidfile
-
-	logger "restarting piaware. hopefully i'll be right back..."
-	::fa_services::invoke_service_action piaware restart
-
-	# sleep apparently restarts on signals, we want to process them,
-	# so use after/vwait so the event loop runs.
-	after 10000 [list set ::die 1]
-	vwait ::die
-
-	logger "piaware failed to die, pid [pid], that's me, i'm gonna kill myself"
-	exit 0
-}
-
 
 #
 # setup_signals - arrange for common signals to shutdown the program
@@ -492,7 +467,6 @@ proc reload_config {} {
 	reread_piaware_config
 
 	# re-init derived values
-	::fa_sudo::clear_sudo_cache
 	setup_faup1090_vars
 
 	# shut down existing stuff and reconnect

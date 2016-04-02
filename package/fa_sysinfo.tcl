@@ -1,12 +1,10 @@
 # Package that contains various system-info-collecting helpers
 
-package require fa_sudo
-
 namespace eval ::fa_sysinfo {
 	# filesystem_usage - return a list of mountpoint / percentage-used pairs
 	proc filesystem_usage {} {
 		set result [list]
-		set fp [::fa_sudo::open_as "|/bin/df --output=target,pcent"]
+		set fp [open "|/bin/df --output=target,pcent"]
 		gets $fp ;# skip header line
 		while {[gets $fp line] >= 0} {
 			lassign $line mountpoint percent
@@ -129,7 +127,7 @@ namespace eval ::fa_sysinfo {
 		# and everything else, in that order. If there's still a tie,
 		# use the interface name as a tiebreaker.
 
-		if {[catch {set fp [::fa_sudo::open_as "|/sbin/ip -o link show"]} catchResult] == 1} {
+		if {[catch {set fp [open "|/sbin/ip -o link show"]} catchResult] == 1} {
 			puts stderr "ip command not found on this version of Linux, you may need to install the iproute2 package and try again"
 			return ""
 		}
@@ -178,7 +176,7 @@ namespace eval ::fa_sysinfo {
 	}
 
 	proc interface_ip_and_prefix {dev} {
-		set fp [::fa_sudo::open_as "|ip -o address show dev $dev"]
+		set fp [open "|ip -o address show dev $dev"]
 		try {
 			while {[gets $fp line] >= 0} {
 				if {[regexp {inet ([^/]*)/(\S+)} $line -> ip prefix]} {
@@ -282,7 +280,7 @@ namespace eval ::fa_sysinfo {
 		set gateway ""
 		set ip ""
 
-		set fp [::fa_sudo::open_as "|ip -o route get to $target"]
+		set fp [open "|ip -o route get to $target"]
 		try {
 			while {[gets $fp line] >= 0} {
 				if {[lindex $line 0] ne $target} {
